@@ -1,8 +1,13 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Win32;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using UserAuthorization.API.Entities;
+using UserAuthorization.API.Entities.Authentication.Login;
 using UserAuthorization.API.Entities.Authentication.SignUp;
 using UserAuthorization.Facade.Models;
 using UserAuthorization.Facade.Services;
@@ -124,6 +129,76 @@ namespace UserAuthorization.API.Controllers
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
             }
+        }
+
+        [HttpPost]
+        [Route("Login")]
+        public async Task<IActionResult> Login([FromBody] LoginUser request)
+        {
+            try
+            {
+                if(ModelState.IsValid)
+                {
+                    var user = await _userManager.FindByEmailAsync(request.Email);
+
+                    if (user != null || (await _userManager.CheckPasswordAsync(user, request.Password)))
+                    {
+                        var authClaims = new List<Claim>
+                        {
+                            new Claim(ClaimTypes.Name, user.UserName),
+                            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                        };
+
+                        var userRole = await _userManager.GetRolesAsync(user);
+
+                        foreach(var role in userRole)
+                        {
+                            authClaims.Add(new Claim(ClaimTypes.Role, role));
+                        }
+
+                        var jwtToken = GetToken(authClaims);
+
+                        if(jwtToken != null)
+                        {
+                            var message = new Message(new string[] { user.Email! }, "Login information", $"Login success! date : {DateTime.Now}");
+                            _emailService.SendEmail(message);
+                        }
+
+                        return Ok(new
+                        {
+                            token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
+                            expirrd = jwtToken.ValidTo
+                        });
+
+                    }
+
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Login failed, please check email or password!" });
+                }
+                else
+                {
+                    return BadRequest(ModelState);
+                }
+                
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
+            }
+        }
+
+
+        private JwtSecurityToken GetToken(List<Claim> authClaim)
+        {
+            var authSignKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JWT:ValidIssuer"],
+                audience: _configuration["JWT:ValidAudience"],
+                expires: DateTime.Now.AddMinutes(60),
+                claims: authClaim,
+                signingCredentials: new SigningCredentials(authSignKey, SecurityAlgorithms.HmacSha512)
+
+                );
+            return token;
         }
 
     }

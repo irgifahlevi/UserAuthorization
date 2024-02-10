@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UserAuthorization.API.Entities;
 
@@ -13,6 +15,19 @@ builder.Services.AddSwaggerGen();
 // Configuration Entity Framework
 var connection = builder.Configuration.GetConnectionString("DB");
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connection));
+
+// Configuration Identity
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+   .AddEntityFrameworkStores<AppDbContext>()
+   .AddDefaultTokenProviders();
+
+// Adding Authentication
+builder.Services.AddAuthentication(o =>
+{
+    o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+});
 
 var app = builder.Build();
 

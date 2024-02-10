@@ -10,5 +10,6 @@ namespace UserAuthorization.Facade.Services
     public interface IEmailRepository
     {
         public void SendEmail(Message message);
+        public bool IsValidEmail(string email);
     }
 }

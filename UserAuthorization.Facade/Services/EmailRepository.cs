@@ -3,6 +3,7 @@ using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using netMail = System.Net.Mail;
 using System.Text;
 using System.Threading.Tasks;
 using UserAuthorization.Facade.Models;
@@ -54,6 +55,19 @@ namespace UserAuthorization.Facade.Services
             {
                 client.Disconnect(true);
                 client.Dispose();
+            }
+        }
+
+        public bool IsValidEmail(string email)
+        {
+            try
+            {
+                var addr = new netMail.MailAddress(email);
+                return addr.Address == email;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

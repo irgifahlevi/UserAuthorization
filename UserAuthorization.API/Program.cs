@@ -37,6 +37,11 @@ var emailConfig = builder.Configuration
     .Get<EmailConfig>();
 builder.Services.AddSingleton(emailConfig);
 
+// Configuration Required Email
+builder.Services.Configure<IdentityOptions>(
+    opts => opts.SignIn.RequireConfirmedEmail = true
+    );
+
 builder.Services.AddScoped<IEmailRepository, EmailRepository>();
 
 var app = builder.Build();

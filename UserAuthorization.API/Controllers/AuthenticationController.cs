@@ -62,7 +62,12 @@ namespace UserAuthorization.API.Controllers
 
                     await _userManager.AddToRoleAsync(user, role);
 
-                    return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = "User created successfully!" });
+                    var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                    var confirmationLink = Url.Action(nameof(ConfirmEmail), "Authentication", new { token, email = user.Email }, Request.Scheme);
+                    var message = new Message(new string[] { user.Email! }, "Confirmation email link", confirmationLink!);
+                    _emailService.SendEmail(message);
+
+                    return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = $"User created success and verification email send to {user.Email} !" });
                 }
                 else
                 {
@@ -78,12 +83,48 @@ namespace UserAuthorization.API.Controllers
 
 
         [HttpGet]
-        [Route("Test")]
-        public async Task<IActionResult> TestEmail()
+        [Route("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail(string token, string email)
         {
-            var message = new Message(new string[] { "riski.irwan65@gmail.com" }, "Kontol", "Coba kirim email");
-            _emailService.SendEmail(message);
-            return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = "Test email" });
+            try
+            { 
+                if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(email))
+                {
+                    return BadRequest(new Response { Status = "Error", Message = "Token and email are required." });
+                }
+
+                if (!_emailService.IsValidEmail(email))
+                {
+                    return BadRequest(new Response { Status = "Error", Message = "Invalid email format." });
+                }
+
+                var user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Failed to confirm email." });
+                }
+
+                if(user.EmailConfirmed)
+                {
+                    return BadRequest(new Response { Status = "Error", Message = "Email has already been verified." });
+                }
+          
+
+                var result = await _userManager.ConfirmEmailAsync(user, token);
+
+                if (!result.Succeeded)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Failed to register, please check username, email or password!" });
+                }
+
+                return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = "Verify email successfully!" });
+
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
+            }
         }
+
     }
 }

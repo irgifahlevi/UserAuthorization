@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Win32;
 using UserAuthorization.API.Entities;
 using UserAuthorization.API.Entities.Authentication.SignUp;
+using UserAuthorization.Facade.Models;
+using UserAuthorization.Facade.Services;
 
 namespace UserAuthorization.API.Controllers
 {
@@ -14,12 +16,14 @@ namespace UserAuthorization.API.Controllers
         private readonly UserManager<IdentityUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IConfiguration _configuration;
+        private readonly IEmailRepository _emailService;
 
-        public AuthenticationController(UserManager<IdentityUser> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration)
+        public AuthenticationController(UserManager<IdentityUser> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IEmailRepository emailServce)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _configuration = configuration;
+            _emailService = emailServce;
         }
 
         [HttpPost]
@@ -70,6 +74,16 @@ namespace UserAuthorization.API.Controllers
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
             }
+        }
+
+
+        [HttpGet]
+        [Route("Test")]
+        public async Task<IActionResult> TestEmail()
+        {
+            var message = new Message(new string[] { "riski.irwan65@gmail.com" }, "Kontol", "Coba kirim email");
+            _emailService.SendEmail(message);
+            return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = "Test email" });
         }
     }
 }

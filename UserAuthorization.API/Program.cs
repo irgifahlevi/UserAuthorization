@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using UserAuthorization.API.Entities;
+using UserAuthorization.Facade.Models;
+using UserAuthorization.Facade.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,14 @@ builder.Services.AddAuthentication(o =>
     o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
 });
+
+//Configuration SMTP Email
+var emailConfig = builder.Configuration
+    .GetSection("EmailConfiguration")
+    .Get<EmailConfig>();
+builder.Services.AddSingleton(emailConfig);
+
+builder.Services.AddScoped<IEmailRepository, EmailRepository>();
 
 var app = builder.Build();
 

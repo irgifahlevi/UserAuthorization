@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +8,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using UserAuthorization.API.Entities;
+using UserAuthorization.API.Entities.Authentication;
 using UserAuthorization.API.Entities.Authentication.Login;
 using UserAuthorization.API.Entities.Authentication.SignUp;
 using UserAuthorization.Facade.Models;
@@ -143,8 +145,8 @@ namespace UserAuthorization.API.Controllers
                 if(ModelState.IsValid)
                 {
                     var user = await _userManager.FindByEmailAsync(request.Email);
-
-                    if (user != null || (await _userManager.CheckPasswordAsync(user, request.Password)))
+                    var check = await _userManager.CheckPasswordAsync(user, request.Password)
+                    if (check == true && user != null)
                     {
                         if (user.TwoFactorEnabled)
                         {
@@ -267,6 +269,128 @@ namespace UserAuthorization.API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message});
             }
         }
+
+
+        [HttpPost]
+        [AllowAnonymous]
+        [Route("ForgotPassword")]
+        public async Task<IActionResult> ForgotPassword(ForgotPassword request)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    if (!_emailService.IsValidEmail(request.Email))
+                    {
+                        return BadRequest(new Response { Status = "Error", Message = "Invalid email format." });
+                    }
+
+                    var user = await _userManager.FindByEmailAsync(request.Email);
+
+                    if (user != null)
+                    {
+                        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+                        var forgotPasswordLink = Url.Action(nameof(ResetPassword), "Authentication", new { token, email = user.Email }, Request.Scheme);
+
+                        var message = new Message(new string[] { user.Email! }, "Forgot password link", forgotPasswordLink!);
+                        _emailService.SendEmail(message);
+
+                        return Ok(message);
+
+                        //return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = $"Password changed request is send to {user.Email}" });
+                    }
+
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Could not send link to email, please try again later!" });
+
+                }
+                else
+                {
+                    return BadRequest(ModelState);
+                }
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
+            }
+        }
+
+
+
+        [HttpGet]
+        [AllowAnonymous]
+        [Route(nameof(ResetPassword))]
+        public async Task<IActionResult> ResetPassword(string token, string email)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(email))
+                {
+                    return BadRequest(new Response { Status = "Error", Message = "Token and email are required." });
+                }
+
+                if (!_emailService.IsValidEmail(email))
+                {
+                    return BadRequest(new Response { Status = "Error", Message = "Invalid email format." });
+                }
+
+                var model = new ResetPassword { Token = token, Email = email };
+                return Ok(model);
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
+            }
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        [Route(nameof(ResetPassword))]
+        public async Task<IActionResult> ResetPassword(ResetPassword request)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    if (!_emailService.IsValidEmail(request.Email))
+                    {
+                        return BadRequest(new Response { Status = "Error", Message = "Invalid email format." });
+                    }
+
+                    var user = await _userManager.FindByEmailAsync(request.Email);
+
+                    if (user != null)
+                    {
+                        var resetPassword = await _userManager.ResetPasswordAsync(user, request.Token, request.Password);
+                        if(resetPassword.Succeeded)
+                        {
+                            return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = $"Password changed request is send to {user.Email}" });
+                        }
+                        else
+                        {
+                            foreach (var error in resetPassword.Errors)
+                            {
+                                ModelState.AddModelError(error.Code, error.Description);
+                            }
+
+                            return StatusCode(StatusCodes.Status500InternalServerError, ModelState);
+                        }
+                    }
+
+                    return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Failed update password, please try again later!" });
+
+                }
+                else
+                {
+                    return BadRequest(ModelState);
+                }
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = e.Message });
+            }
+        }
+
         private JwtSecurityToken GetToken(List<Claim> authClaim)
         {
             var authSignKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Secret"]));

@@ -145,7 +145,7 @@ namespace UserAuthorization.API.Controllers
                 if(ModelState.IsValid)
                 {
                     var user = await _userManager.FindByEmailAsync(request.Email);
-                    var check = await _userManager.CheckPasswordAsync(user, request.Password)
+                    var check = await _userManager.CheckPasswordAsync(user, request.Password);
                     if (check == true && user != null)
                     {
                         if (user.TwoFactorEnabled)
@@ -364,16 +364,7 @@ namespace UserAuthorization.API.Controllers
                         var resetPassword = await _userManager.ResetPasswordAsync(user, request.Token, request.Password);
                         if(resetPassword.Succeeded)
                         {
-                            return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = $"Password changed request is send to {user.Email}" });
-                        }
-                        else
-                        {
-                            foreach (var error in resetPassword.Errors)
-                            {
-                                ModelState.AddModelError(error.Code, error.Description);
-                            }
-
-                            return StatusCode(StatusCodes.Status500InternalServerError, ModelState);
+                            return StatusCode(StatusCodes.Status201Created, new Response { Status = "Success", Message = $"Password changed sucessfully, you can log in with the new password" });
                         }
                     }
 
